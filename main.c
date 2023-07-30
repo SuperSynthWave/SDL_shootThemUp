@@ -1,9 +1,13 @@
 #include "main.h"
 #include "structs.h"
+#include "initialize.h"
 
 #define DEBUG true
 #define test 1
 
+bool runStartGameDisplay();
+bool runGamePlay();
+bool runGameOverDisplay();
 void doEvents();
 void updatePlayer();
 void updateBullet();
@@ -18,119 +22,112 @@ void checkBulletHitsEnemy(struct Entity *bullet);
 void spawnAsteroid();
 void updateAsteroids();
 void DisplayPlayerHealth(struct Entity *player);
-void checkBulletHitsPlayer(struct Entity *bullet);
+void checkEnemyEntitytHitsPlayer(struct Entity *bullet);
+void DisplayScore();
 
 int main(){
-    SDL_Surface* s;
+    bool gameOver = false;
 
-    if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_VIDEO) != 0){
-        printf("Error while Initializing SDL %s",SDL_GetError());
+    if(initGame() != 0){
         return 1;
+    };
+
+    if(runStartGameDisplay()){
+        APPRUN = true;
+        app.mode = gameloop;
+        gameOver = runGamePlay();
     }
 
-    if(IMG_Init(IMG_INIT_PNG|IMG_INIT_JPG) == 0){
-        printf("Error while Initializing SDL_Image %s",SDL_GetError());
-        SDL_Quit();
-        return 1;
+    SDL_DestroyRenderer(app.r);
+    SDL_DestroyWindow(app.w);
+    SDL_Quit();
+    IMG_Quit();
+    return 0;
+}
+
+bool runStartGameDisplay(){
+    int menu = 0;
+    const int menucount = 2;
+    char menuTexts[2][20] = {"Play Game", "Quit Game"};
+    bool RUNMENULOOP = true;
+
+    SDL_Color clr = {255,255,255,255};
+    SDL_Surface *s;
+    SDL_Texture *t;
+    SDL_Rect textrec;
+    int i;
+
+    while(RUNMENULOOP){
+        SDL_SetRenderDrawColor(app.r,0,0,255,255);
+        SDL_RenderClear(app.r);
+
+
+        if(app.KEYBOARDEVENTS[SDL_SCANCODE_DOWN]){
+                if(menu == (menucount -1)){
+                    menu = 0;
+                }else{
+                    menu++;
+                }
+            }
+            else if(app.KEYBOARDEVENTS[SDL_SCANCODE_UP]){
+                if(menu == 0){
+                    menu = menucount -1;
+                }else{
+                    menu--;
+                }
+        }else if(app.KEYBOARDEVENTS[SDL_SCANCODE_RETURN]|| app.KEYBOARDEVENTS[SDL_SCANCODE_LCTRL]){
+            if(menu == 0) return true;
+            return false;
+        }
+
+        for(i=0;i<menucount;i++){
+            
+            printf("%s\n",menuTexts[i]);
+            s = TTF_RenderText_Solid(app.font,menuTexts[i],clr);
+            t = SDL_CreateTextureFromSurface(app.r,s);
+            SDL_FreeSurface(s);
+            
+            SDL_QueryTexture(t,NULL,NULL,&textrec.w,&textrec.h);
+            if(i == 0){
+                textrec.y = (int)SCREEN_HEIGHT/2 - ((int)(menucount/2) * textrec.h);
+            }
+
+            if(menu == i){
+                textrec.w = textrec.w * 1.5;
+            }
+            textrec.x = SCREEN_WIDTH/2 - textrec.w/2;
+
+            SDL_RenderCopy(app.r,t,NULL,&textrec);
+            textrec.y += textrec.h;
+            SDL_DestroyTexture(t);
+        }
+        SDL_RenderPresent(app.r);
+        SDL_Delay(200);
+        doEvents();
+        RUNMENULOOP = APPRUN;
     }
+    APPRUN = true;
+    if (menu == 0) return true;
+    return false;
+}
 
+bool initStartGameDisplay(){
+    SDL_Surface *s;
+    s = IMG_Load("");
 
-    app.w = SDL_CreateWindow("Shoot Them Up!!",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SCREEN_WIDTH,SCREEN_HEIGHT,0);
-
-    if(!app.w){
-        printf("Error while creating window %s",SDL_GetError());
-        SDL_Quit();
-        IMG_Quit();
-        return 1;
-    }
-
-    app.r = SDL_CreateRenderer(app.w,-1,SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
-    if(!app.r){
-        printf("Error while creating renderer %s",SDL_GetError());
-        SDL_DestroyWindow(app.w);
-        SDL_Quit();
-        IMG_Quit();
-        return 1;
-    }
-
-    bullethead = 0;
-    enemyhead = 0;
-
-    s= IMG_Load("assets/player_ship.png");
-
-    if(!s){
-        printf("Error while creating player surface %s",SDL_GetError());
-        SDL_DestroyWindow(app.w);
-        SDL_Quit();
-        IMG_Quit();
-        return 1;
-    }
-
-    
-    player.health = 100;
-    player.reloadRate = 10;
-    player.t = SDL_CreateTextureFromSurface(app.r,s);
-    SDL_FreeSurface(s);
-
-    
-    if(!player.t){
-        printf("Error while creating player texture %s",SDL_GetError());
-        SDL_DestroyWindow(app.w);
-        SDL_Quit();
-        IMG_Quit();
-        return 1;
-    }
-    SDL_QueryTexture(player.t,NULL,NULL,&player.box.w,&player.box.h);
-    player.box.x = SCREEN_WIDTH/2 - player.box.w/2;
-    player.box.y = SCREEN_HEIGHT - player.box.h;   
-    player.side = Type_Player;
-
-    s= IMG_Load("assets/player_laser.png");
-    if(!s){
-        printf("Error while creating bullet surface %s",SDL_GetError());
-        SDL_DestroyWindow(app.w);
-        SDL_Quit();
-        IMG_Quit();
-        return 1;
-    }
-
-    bullet.box.x = 0;
-    bullet.box.y = 0;
-    bullet.health = 0;
-    bullet.t = SDL_CreateTextureFromSurface(app.r,s);
-    SDL_FreeSurface(s);
-
-    if(!bullet.t){
-        printf("Error while creating bullet texture %s",SDL_GetError());
-        SDL_DestroyWindow(app.w);
-        SDL_Quit();
-        IMG_Quit();
-        return 1;
-    }
-
-    SDL_QueryTexture(bullet.t,NULL,NULL,&bullet.box.w,&bullet.box.h);
-    
-    s= IMG_Load("assets/Background.jpg");
     app.background = SDL_CreateTextureFromSurface(app.r,s);
     SDL_FreeSurface(s);
     if(!app.background){
-        printf("Error while creating background texture %s",SDL_GetError());
-        SDL_Quit();
-        IMG_Quit();
+        printf("Error while creating start page texture %s",SDL_GetError());
         return 1;
     }
 
-    TTF_Init();
-    app.font = TTF_OpenFont("Fonts/Antonio-Regular.ttf",30);
-    if(!app.font){
-        printf("Error while creating font %s",SDL_GetError());
-        SDL_Quit();
-        IMG_Quit();
-        return 1;
-    }
+    app.mode = startpage;
+    return 0;       
+}
 
-    while (APPRUN)
+bool runGamePlay(){
+while (APPRUN)
     {
     SDL_SetRenderDrawColor(app.r,255,255,255,255);
     SDL_RenderClear(app.r);
@@ -144,17 +141,13 @@ int main(){
     //     updateBullet();
     // }
     _updateBullet();
+    DisplayScore();
     updateAsteroids();
     spawnEnemies();
     spawnAsteroid();
     SDL_RenderPresent(app.r);
     }
-
-    SDL_DestroyRenderer(app.r);
-    SDL_DestroyWindow(app.w);
-    SDL_Quit();
-    IMG_Quit();
-    return 0;
+return true;
 }
 
 void doEvents(){
@@ -195,6 +188,14 @@ void doKeyUP(SDL_KeyboardEvent e){
 
 void updatePlayer(){
 
+    if(player.health <= 0)
+    {
+        player.health = 0;
+        APPRUN = false;
+        DisplayPlayerHealth(&player);
+        return;
+    }
+
     if(app.KEYBOARDEVENTS[SDL_SCANCODE_UP]){
         #if DEBUG
         printf("update player SDL_SCANCODE_UP\n");
@@ -234,7 +235,6 @@ void updatePlayer(){
         if(--player.reloadRate <=0){
             fireBullet(&player);
         }
-        
     }
 
     SDL_RenderCopy(app.r,player.t,NULL,&player.box);
@@ -267,10 +267,12 @@ void fireBullet(struct Entity *sender){
     if(sender->side == Type_Player){
         newbullet->box.y = sender->box.y;
         newbullet->dy = -20;
+        newbullet->lifesteal = 50;
         sender->reloadRate = 10;
     }else{
         newbullet->box.y = sender->box.y + sender->box.h;
         newbullet->dy = sender->dy * 2;
+        newbullet->lifesteal = 2;
         sender->reloadRate = 30;
     }
     
@@ -308,7 +310,7 @@ void spawnEnemies(){
     enemy->health = 100;
     enemy->side = Type_Enemey;
     enemy->reloadRate = 30;
-
+    enemy->lifesteal = 10;
     enemySpwawnCounter = 20 + rand() % 60;
     }
 }
@@ -342,6 +344,7 @@ void spawnAsteroid(){
     asteroid->dy = 1 + rand() % 5;
     asteroid->health = 1;
     asteroid->side = Type_Enemey;
+    asteroid->lifesteal = 5;
     asteroidSpwawnCounter = 50 + rand() % 100;
     }
 }
@@ -369,7 +372,7 @@ void updateEnemies(){
 
 
         if(currenemy->health <= 0){
-            
+
             if(prevenemy){
                 
                 prevenemy->next = currenemy->next;
@@ -427,7 +430,7 @@ void _updateBullet(){
                     checkBulletHitsEnemy(currBullet);
                 }
                 else{
-                    checkBulletHitsPlayer(currBullet);
+                    checkEnemyEntitytHitsPlayer(currBullet);
                 }
             }
         }
@@ -467,7 +470,7 @@ void updateAsteroids(){
            else{
                 currAst->box.y += currAst->dy;
                 currAst->box.x += currAst->dx;
-                //checkBulletHitsEnemy(currBullet);
+                checkEnemyEntitytHitsPlayer(currAst);
             }
         }
         
@@ -490,6 +493,8 @@ void updateAsteroids(){
     }
 }
 
+
+
 void checkBulletHitsEnemy(struct Entity *bullet){
     struct Entity *enemy;
     enemy = enemyhead;
@@ -501,7 +506,8 @@ void checkBulletHitsEnemy(struct Entity *bullet){
             (bullet->box.x > enemy->box.x && bullet->box.x < enemy->box.x + enemy->box.w)
          ){
             bullet->health = 0;
-            enemy->health -= 50;
+            enemy->health -= bullet->lifesteal;
+            if(enemy->health <= 0) app.score ++;
             break;
         }
 
@@ -511,12 +517,12 @@ void checkBulletHitsEnemy(struct Entity *bullet){
 }
 
 
-void checkBulletHitsPlayer(struct Entity *bullet){
+void checkEnemyEntitytHitsPlayer(struct Entity *bullet){
      if((bullet->box.y > player.box.y && bullet->box.y < player.box.y + player.box.h)
             &&
             (bullet->box.x > player.box.x && bullet->box.x < player.box.x + player.box.w)
          ){
-            player.health -=5;
+            player.health -= bullet->lifesteal;
             bullet->health = 0;
          }
 }
@@ -541,6 +547,22 @@ void DisplayPlayerHealth(struct Entity *player){
     SDL_Surface *s = TTF_RenderText_Solid(app.font,heatlstr,colr);
     SDL_Texture *t = SDL_CreateTextureFromSurface(app.r,s);
     SDL_RenderCopy(app.r,t,NULL,&fontrect);
+    SDL_FreeSurface(s);
+    SDL_DestroyTexture(t);
+}
+
+void DisplayScore(){
+    SDL_Color clr = {255,255,255,255};
+    char scorestr[20];
+    sprintf(scorestr,"SCORE = %d",app.score);
+
+    SDL_Rect textrect;
+    SDL_Surface *s = TTF_RenderText_Solid(app.font,scorestr,clr);
+    SDL_Texture *t = SDL_CreateTextureFromSurface(app.r,s);
+    SDL_QueryTexture(t,NULL,NULL,&textrect.w,&textrect.h);
+    textrect.y = 0;
+    textrect.x = SCREEN_WIDTH - textrect.w;
+    SDL_RenderCopy(app.r,t,NULL,&textrect);
     SDL_FreeSurface(s);
     SDL_DestroyTexture(t);
 }
