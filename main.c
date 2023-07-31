@@ -9,7 +9,7 @@ bool runStartGameDisplay();
 bool runGamePlay();
 bool runGameOverDisplay();
 void doEvents();
-void updatePlayer();
+void updatePlayer(bool *gameOver);
 void updateBullet();
 void doKeyDOWN(SDL_KeyboardEvent e);
 void doKeyUP(SDL_KeyboardEvent e);
@@ -33,9 +33,23 @@ int main(){
     };
 
     if(runStartGameDisplay()){
-        APPRUN = true;
-        app.mode = gameloop;
-        gameOver = runGamePlay();
+        while (1)
+        {
+            APPRUN = true;
+            app.mode = gameloop;
+            gameOver = runGamePlay();
+            if(gameOver){
+                printf("Resetting game\n");
+               ResetGame();
+               printf("Resetting complete\n");
+               APPRUN = true;
+               if(!runStartGameDisplay()) break;
+               printf("Start game display complete\n");
+            }
+            else break;
+        }
+        
+        
     }
 
     SDL_DestroyRenderer(app.r);
@@ -46,21 +60,23 @@ int main(){
 }
 
 bool runStartGameDisplay(){
+    bool gameOver;
     int menu = 0;
     const int menucount = 2;
     char menuTexts[2][20] = {"Play Game", "Quit Game"};
     bool RUNMENULOOP = true;
 
+    bool firstloop = true;
     SDL_Color clr = {255,255,255,255};
     SDL_Surface *s;
     SDL_Texture *t;
     SDL_Rect textrec;
+    SDL_Rect gameoverrect;
     int i;
 
     while(RUNMENULOOP){
         SDL_SetRenderDrawColor(app.r,0,0,255,255);
         SDL_RenderClear(app.r);
-
 
         if(app.KEYBOARDEVENTS[SDL_SCANCODE_DOWN]){
                 if(menu == (menucount -1)){
@@ -81,16 +97,17 @@ bool runStartGameDisplay(){
         }
 
         for(i=0;i<menucount;i++){
-            
-            printf("%s\n",menuTexts[i]);
+            printf("%s start\n",menuTexts[i]);
+
             s = TTF_RenderText_Solid(app.font,menuTexts[i],clr);
             t = SDL_CreateTextureFromSurface(app.r,s);
-            SDL_FreeSurface(s);
-            
+            if(s) SDL_FreeSurface(s);
+            s= NULL;
             SDL_QueryTexture(t,NULL,NULL,&textrec.w,&textrec.h);
             if(i == 0){
                 textrec.y = (int)SCREEN_HEIGHT/2 - ((int)(menucount/2) * textrec.h);
             }
+
 
             if(menu == i){
                 textrec.w = textrec.w * 1.5;
@@ -99,10 +116,20 @@ bool runStartGameDisplay(){
 
             SDL_RenderCopy(app.r,t,NULL,&textrec);
             textrec.y += textrec.h;
-            SDL_DestroyTexture(t);
+            if(t) SDL_DestroyTexture(t);
+            t=NULL;
+            printf("%s end\n",menuTexts[i]);
+        }
+
+        if(gameOver){
+
         }
         SDL_RenderPresent(app.r);
         SDL_Delay(200);
+        if(firstloop){
+            SDL_Delay(1800);
+            firstloop = false;
+        }
         doEvents();
         RUNMENULOOP = APPRUN;
     }
@@ -127,27 +154,44 @@ bool initStartGameDisplay(){
 }
 
 bool runGamePlay(){
+
+bool gameOver = false;
+
 while (APPRUN)
     {
+    
     SDL_SetRenderDrawColor(app.r,255,255,255,255);
     SDL_RenderClear(app.r);
     SDL_RenderCopy(app.r,app.background,NULL,NULL);
 
+    
     doEvents();
+    updatePlayer(&gameOver); 
 
-    updatePlayer();    
-    updateEnemies();
-    // if(bullet.health > 0 || app.KEYBOARDEVENTS[SDL_SCANCODE_LCTRL]){
-    //     updateBullet();
-    // }
-    _updateBullet();
-    DisplayScore();
-    updateAsteroids();
-    spawnEnemies();
-    spawnAsteroid();
+    if(!gameOver){
+        printf("Updating enemies\n");
+        updateEnemies();
+
+        printf("Updating bullets\n");
+        _updateBullet();
+
+        printf("displaying score\n");
+        DisplayScore();
+
+        printf("Updating asterids\n");
+        updateAsteroids();
+
+        printf("Spawning enemies\n");
+        spawnEnemies();
+
+        printf("Spawning asteroids\n");
+        spawnAsteroid();
+    }   
+    
     SDL_RenderPresent(app.r);
     }
-return true;
+
+    return gameOver;
 }
 
 void doEvents(){
@@ -186,13 +230,14 @@ void doKeyUP(SDL_KeyboardEvent e){
     }
 }
 
-void updatePlayer(){
+void updatePlayer(bool *gameover){
 
     if(player.health <= 0)
     {
         player.health = 0;
         APPRUN = false;
         DisplayPlayerHealth(&player);
+        *gameover = true;
         return;
     }
 
@@ -354,10 +399,10 @@ void updateEnemies(){
     int count = 0;
     prevenemy = 0;
     currenemy = enemyhead;
-
+    
     while(currenemy){
         count++;
-
+        printf("Curr enemy %d\n",count);
         if(currenemy->health > 0){
             if(currenemy->box.y > SCREEN_HEIGHT){
                 currenemy->health = 0;
@@ -369,7 +414,6 @@ void updateEnemies(){
                 }
             }
         }
-
 
         if(currenemy->health <= 0){
 
@@ -460,6 +504,7 @@ void updateAsteroids(){
     prevAst = 0;
     currAst = astHead;
 
+
     while (currAst)
     {
         count++;
@@ -473,6 +518,7 @@ void updateAsteroids(){
                 checkEnemyEntitytHitsPlayer(currAst);
             }
         }
+
         
         if(currAst->health <= 0){
             if(prevAst){

@@ -2,7 +2,7 @@
 #include "structs.h"
 
 int initGame();
-
+void clearEntitySystem(struct Entity **head);
 
 int initGame(){
     SDL_Surface* s;
@@ -116,5 +116,46 @@ int initGame(){
 
     app.score = 0;
     return 0;
+
+}
+
+void ResetGame(){
+    player.health = 100;
+    player.dx = 0;
+    player.dy = 0;
+    player.next = NULL;
+    player.reloadRate  = 10;
+
+    app.score = 0;
+
+    printf("Clearing enemies..\n");
+    clearEntitySystem(&enemyhead);
+    if(!enemyhead) printf("Enemy cleared");
+    printf("Clearing bullets..\n");
+    clearEntitySystem(&bullethead);
+    printf("Clearing asteroids..\n");
+    clearEntitySystem(&astHead);
+
+}
+
+void clearEntitySystem(struct Entity **head){
+
+    int count = 0;
+    struct Entity *curr;
+    struct Entity *next;
+    next = 0;
+
+    curr = *head;
+    while(curr){
+        count++;
+        printf("Clearing entity %d\n",count);
+        next = curr->next;
+        memset(curr,0,sizeof(curr));
+        free(curr);
+        curr = 0;
+        curr = next;
+    }
+
+   *head = NULL;
 
 }
